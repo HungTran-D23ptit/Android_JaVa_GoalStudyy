@@ -28,6 +28,7 @@ public class StudyModeActivity extends AppCompatActivity {
     private long timeLeftInMillis;
     private boolean isTimerRunning = false;
     private String taskName; // Biến lưu tên task
+    private long taskId = -1; // id task trong DB (nếu có)
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -46,6 +47,7 @@ public class StudyModeActivity extends AppCompatActivity {
         // --- NHẬN DỮ LIỆU TỪ INTENT (QUAN TRỌNG) ---
         taskName = getIntent().getStringExtra("TASK_NAME");
         long durationMinutes = getIntent().getLongExtra("TASK_DURATION_MINUTES", 0);
+        taskId = getIntent().getLongExtra("TASK_ID", -1);
 
         if (taskName != null) {
             tvTaskNameStudy.setText(taskName);
@@ -86,7 +88,28 @@ public class StudyModeActivity extends AppCompatActivity {
             // Cập nhật trạng thái cho MainActivity
             MainActivity.isTimerCurrentlyRunning = false;
 
-            // TODO: Thêm logic cập nhật trạng thái task là "dời lịch" trong database
+            // Cập nhật DB nếu có TASK_ID
+            if (taskId > 0) {
+                new Thread(() -> {
+                    com.example.goalmanagement.data.AppDatabase db = com.example.goalmanagement.data.AppDatabase.getInstance(getApplicationContext());
+                    db.taskDao().updateStatus(taskId, "postponed");
+                    com.example.goalmanagement.data.Task t = db.taskDao().getById(taskId);
+                    if (t != null) {
+                        long oneDay = 24L * 60L * 60L * 1000L;
+                        com.example.goalmanagement.data.Task newTask = new com.example.goalmanagement.data.Task(
+                                t.goalId,
+                                t.title,
+                                t.subject,
+                                t.startAtMillis + oneDay,
+                                t.endAtMillis + oneDay,
+                                t.durationMinutes,
+                                getNextDayKey(t.dayKey),
+                                "pending"
+                        );
+                        db.taskDao().insert(newTask);
+                    }
+                }).start();
+            }
             finish(); // Đóng màn hình
         });
     }
@@ -165,9 +188,28 @@ public class StudyModeActivity extends AppCompatActivity {
         // --- CẬP NHẬT TRẠNG THÁI CHO MAINACTIVITY ---
         MainActivity.isTimerCurrentlyRunning = false;
 
-        // TODO: Đánh dấu task là hoàn thành trong database
+        // Đánh dấu task là hoàn thành trong database
+        if (taskId > 0) {
+            new Thread(() -> {
+                com.example.goalmanagement.data.AppDatabase db = com.example.goalmanagement.data.AppDatabase.getInstance(getApplicationContext());
+                db.taskDao().updateStatus(taskId, "completed");
+            }).start();
+        }
         Toast.makeText(this, "Đã hoàn thành!", Toast.LENGTH_SHORT).show();
         finish();
+    }
+
+    private String getNextDayKey(String dayKey) {
+        try {
+            java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault());
+            java.util.Date d = sdf.parse(dayKey);
+            java.util.Calendar c = java.util.Calendar.getInstance();
+            c.setTime(d);
+            c.add(java.util.Calendar.DATE, 1);
+            return sdf.format(c.getTime());
+        } catch (Exception e) {
+            return dayKey;
+        }
     }
 
     // Hiển thị Dialog Hết giờ (Giữ nguyên)

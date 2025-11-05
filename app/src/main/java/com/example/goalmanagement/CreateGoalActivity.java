@@ -1,193 +1,190 @@
 package com.example.goalmanagement;
 
 import androidx.appcompat.app.AppCompatActivity;
-import androidx.cardview.widget.CardView; // Thêm import này
+import androidx.cardview.widget.CardView;
 import android.app.DatePickerDialog;
 import android.app.TimePickerDialog;
-import android.content.Intent;
-import android.graphics.Color; // Thêm import này
 import android.os.Bundle;
 import android.view.View;
 import android.widget.Button;
 import android.widget.DatePicker;
 import android.widget.EditText;
-// import android.widget.TextView; // Import này có thể không cần nữa nếu bạn không dùng TextView cho Loại mục tiêu
 import android.widget.TimePicker;
 import android.widget.Toast;
-
+import com.example.goalmanagement.data.AppDatabase;
+import com.example.goalmanagement.data.Goal;
+import com.example.goalmanagement.data.Routine;
+import com.example.goalmanagement.scheduler.ScheduleGenerator;
 import java.util.Calendar;
-// import java.util.ArrayList; // Import này không cần thiết trong code mới này
 
 public class CreateGoalActivity extends AppCompatActivity {
-
-    EditText etCurrentScore, etTargetScore, etGoalTime, etHoursPerDay; // Thêm etCurrentScore, etTargetScore
+    EditText etCurrentScore, etTargetScore, etGoalTime, etHoursPerDay;
     Button btnCreateGoalFinal;
-
-    // Khai báo các CardView mới cho "Loại mục tiêu"
     CardView cardGoalTypeToeic, cardGoalTypeIelts, cardGoalTypeReading, cardGoalTypeExercise;
-    // Để lưu trạng thái chọn
     private CardView selectedGoalTypeCard = null;
-    private String selectedGoalType = ""; // Lưu tên loại mục tiêu đã chọn
+    private String selectedGoalType = "";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_create_goal);
-
-        // 1. Ánh xạ View
         etCurrentScore = findViewById(R.id.et_current_score);
         etTargetScore = findViewById(R.id.et_target_score);
         etGoalTime = findViewById(R.id.et_goal_time);
         etHoursPerDay = findViewById(R.id.et_hours_per_day);
         btnCreateGoalFinal = findViewById(R.id.btn_create_goal_final);
-
-        // Ánh xạ các CardView loại mục tiêu
         cardGoalTypeToeic = findViewById(R.id.card_goal_type_toeic);
         cardGoalTypeIelts = findViewById(R.id.card_goal_type_ielts);
         cardGoalTypeReading = findViewById(R.id.card_goal_type_reading);
         cardGoalTypeExercise = findViewById(R.id.card_goal_type_exercise);
-
-        // 2. Xử lý chọn ngày mục tiêu
-        etGoalTime.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                showDatePickerDialog(etGoalTime); // Truyền EditText vào hàm
-            }
-        });
-
-        // 3. Xử lý chọn giờ học mỗi ngày
-        etHoursPerDay.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                showTimePickerDialog(etHoursPerDay); // Truyền EditText vào hàm
-            }
-        });
-
-        // 4. Xử lý click cho các CardView loại mục tiêu (MỚI)
+        etGoalTime.setOnClickListener(v -> showDatePickerDialog(etGoalTime));
+        etHoursPerDay.setOnClickListener(v -> showTimePickerDialog(etHoursPerDay));
         setupGoalTypeCards();
 
-        // 5. Xử lý khi nhấn nút "Tạo mục tiêu" (nút cuối trang)
-        btnCreateGoalFinal.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                // Kiểm tra các trường bắt buộc
-                if (selectedGoalTypeCard == null) {
-                    Toast.makeText(CreateGoalActivity.this, "Vui lòng chọn loại mục tiêu", Toast.LENGTH_SHORT).show();
-                    return; // Dừng lại nếu chưa chọn loại mục tiêu
-                }
-                if (etGoalTime.getText().toString().isEmpty()) {
-                    Toast.makeText(CreateGoalActivity.this, "Vui lòng chọn thời gian mục tiêu", Toast.LENGTH_SHORT).show();
-                    etGoalTime.requestFocus(); // Focus vào ô bị thiếu
+        btnCreateGoalFinal.setOnClickListener(v -> {
+            if (selectedGoalTypeCard == null) {
+                Toast.makeText(this, "Vui lòng chọn loại mục tiêu", Toast.LENGTH_SHORT).show();
+                return;
+            }
+            String goalTime = etGoalTime.getText().toString().trim();
+            if (goalTime.isEmpty()) {
+                Toast.makeText(this, "Vui lòng chọn ngày hoàn thành (dd.MM.yyyy)", Toast.LENGTH_SHORT).show();
+                etGoalTime.requestFocus();
+                return;
+            }
+            String hoursPerDay = etHoursPerDay.getText().toString().trim();
+            if (hoursPerDay.isEmpty()) {
+                Toast.makeText(this, "Vui lòng chọn thời lượng học mỗi ngày (HH:mm)", Toast.LENGTH_SHORT).show();
+                etHoursPerDay.requestFocus();
+                return;
+            }
+            String currentScore = etCurrentScore.getText().toString().trim();
+            String targetScore = etTargetScore.getText().toString().trim();
+
+            try {
+                String[] parts;
+                if (goalTime.contains(".")) parts = goalTime.split("\\.");
+                else if (goalTime.contains("/")) parts = goalTime.split("/");
+                else {
+                    Toast.makeText(this, "Định dạng ngày không hợp lệ. Dùng dd.MM.yyyy", Toast.LENGTH_SHORT).show();
                     return;
                 }
-                if (etHoursPerDay.getText().toString().isEmpty()) {
-                    Toast.makeText(CreateGoalActivity.this, "Vui lòng chọn số giờ học mỗi ngày", Toast.LENGTH_SHORT).show();
-                    etHoursPerDay.requestFocus(); // Focus vào ô bị thiếu
+                if (parts.length != 3) {
+                    Toast.makeText(this, "Định dạng ngày không hợp lệ. Dùng dd.MM.yyyy", Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                int d = Integer.parseInt(parts[0]);
+                int m = Integer.parseInt(parts[1]) - 1;
+                int y = Integer.parseInt(parts[2]);
+                Calendar cal = Calendar.getInstance();
+                cal.set(Calendar.YEAR, y);
+                cal.set(Calendar.MONTH, m);
+                cal.set(Calendar.DAY_OF_MONTH, d);
+                cal.set(Calendar.HOUR_OF_DAY, 23);
+                cal.set(Calendar.MINUTE, 59);
+                cal.set(Calendar.SECOND, 0);
+                cal.set(Calendar.MILLISECOND, 0);
+                long deadlineMillis = cal.getTimeInMillis();
+                long todayMillis = System.currentTimeMillis();
+                if (deadlineMillis <= todayMillis) {
+                    Toast.makeText(this, "Ngày hoàn thành phải sau ngày hôm nay", Toast.LENGTH_SHORT).show();
                     return;
                 }
 
-                // Lấy dữ liệu (ví dụ)
-                String currentScore = etCurrentScore.getText().toString();
-                String targetScore = etTargetScore.getText().toString();
-                String goalTime = etGoalTime.getText().toString();
-                String hoursPerDay = etHoursPerDay.getText().toString();
-                // selectedGoalType đã được lưu khi chọn Card
+                String[] hm = hoursPerDay.split(":");
+                if (hm.length != 2) {
+                    Toast.makeText(this, "Định dạng thời lượng không hợp lệ. Dùng HH:mm", Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                int hh = Integer.parseInt(hm[0]);
+                int mm = Integer.parseInt(hm[1]);
+                int minutesPerDay = hh * 60 + mm;
+                if (minutesPerDay <= 0) {
+                    Toast.makeText(this, "Thời lượng học mỗi ngày phải lớn hơn 0", Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                if (minutesPerDay > 600) {
+                    Toast.makeText(this, "Thời lượng học mỗi ngày quá lớn (> 10 giờ)", Toast.LENGTH_SHORT).show();
+                    return;
+                }
 
-                // Nếu đã điền đủ -> Chuyển sang màn hình "Tạo bài tập mới"
-                Intent intent = new Intent(CreateGoalActivity.this, CreateTaskActivity.class);
-                // Bạn có thể truyền dữ liệu qua Intent nếu cần
-                intent.putExtra("GOAL_TYPE", selectedGoalType);
-                intent.putExtra("TARGET_SCORE", targetScore); // Ví dụ
-                startActivity(intent);
+                String subjectsCsv;
+                if ("Toeic".equalsIgnoreCase(selectedGoalType)) subjectsCsv = "Listening,Reading,Vocabulary,Grammar";
+                else if ("Ielts".equalsIgnoreCase(selectedGoalType)) subjectsCsv = "Listening,Reading,Writing,Speaking";
+                else if ("Đọc sách".equalsIgnoreCase(selectedGoalType)) subjectsCsv = "Reading";
+                else if ("Tập thể dục".equalsIgnoreCase(selectedGoalType)) subjectsCsv = "Exercise";
+                else subjectsCsv = selectedGoalType;
+
+                new Thread(() -> {
+                    try {
+                        AppDatabase db = AppDatabase.getInstance(getApplicationContext());
+                        Goal goal = new Goal(selectedGoalType + (targetScore.isEmpty() ? "" : " " + targetScore), deadlineMillis, minutesPerDay, subjectsCsv, 0, System.currentTimeMillis());
+                        long goalId = db.goalDao().insert(goal);
+                        goal.id = goalId;
+                        Routine routine = db.routineDao().getSingle();
+                        if (routine == null) {
+                            routine = new Routine(420, 1380, 1140, 1350, 10);
+                            db.routineDao().insert(routine);
+                        }
+                        ScheduleGenerator.generateAndSave(getApplicationContext(), goal, routine);
+                        runOnUiThread(() -> {
+                            Toast.makeText(this, "Đã tạo mục tiêu và sinh lịch học", Toast.LENGTH_SHORT).show();
+                            finish();
+                        });
+                    } catch (Exception e) {
+                        runOnUiThread(() -> Toast.makeText(this, "Không thể tạo mục tiêu: " + e.getMessage(), Toast.LENGTH_SHORT).show());
+                    }
+                }).start();
+
+            } catch (NumberFormatException e) {
+                Toast.makeText(this, "Sai định dạng số. Vui lòng kiểm tra lại ngày/thời lượng", Toast.LENGTH_SHORT).show();
+            } catch (Exception e) {
+                Toast.makeText(this, "Không thể tạo mục tiêu: " + e.getMessage(), Toast.LENGTH_SHORT).show();
             }
         });
     }
 
-    // Hàm hiển thị DatePickerDialog (Sửa để nhận EditText)
     private void showDatePickerDialog(final EditText editText) {
         final Calendar c = Calendar.getInstance();
         int mYear = c.get(Calendar.YEAR);
         int mMonth = c.get(Calendar.MONTH);
         int mDay = c.get(Calendar.DAY_OF_MONTH);
-
-        DatePickerDialog datePickerDialog = new DatePickerDialog(this,
-                new DatePickerDialog.OnDateSetListener() {
-                    @Override
-                    public void onDateSet(DatePicker view, int year,
-                                          int monthOfYear, int dayOfMonth) {
-                        // Định dạng ngày theo ý bạn, ví dụ: "dd.MM.yyyy"
-                        editText.setText(String.format("%02d.%02d.%d", dayOfMonth, (monthOfYear + 1), year));
-                    }
-                }, mYear, mMonth, mDay);
-        // Tùy chọn: Giới hạn ngày tối thiểu là ngày hiện tại
+        DatePickerDialog datePickerDialog = new DatePickerDialog(this, (view, year, monthOfYear, dayOfMonth) -> editText.setText(String.format("%02d.%02d.%d", dayOfMonth, (monthOfYear + 1), year)), mYear, mMonth, mDay);
         datePickerDialog.getDatePicker().setMinDate(System.currentTimeMillis() - 1000);
         datePickerDialog.show();
     }
 
-    // Hàm hiển thị TimePickerDialog (Sửa để nhận EditText)
     private void showTimePickerDialog(final EditText editText) {
         final Calendar c = Calendar.getInstance();
         int mHour = c.get(Calendar.HOUR_OF_DAY);
         int mMinute = c.get(Calendar.MINUTE);
-
-        TimePickerDialog timePickerDialog = new TimePickerDialog(this,
-                new TimePickerDialog.OnTimeSetListener() {
-                    @Override
-                    public void onTimeSet(TimePicker view, int hourOfDay,
-                                          int minute) {
-                        // Định dạng giờ: "HH:mm"
-                        editText.setText(String.format("%02d:%02d", hourOfDay, minute));
-                    }
-                }, mHour, mMinute, true); // true = 24 giờ
+        TimePickerDialog timePickerDialog = new TimePickerDialog(this, (view, hourOfDay, minute) -> editText.setText(String.format("%02d:%02d", hourOfDay, minute)), mHour, mMinute, true);
         timePickerDialog.show();
     }
 
-    // Hàm xử lý logic cho các CardView loại mục tiêu (MỚI)
     private void setupGoalTypeCards() {
-        View.OnClickListener cardClickListener = new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                // Bỏ chọn card hiện tại (nếu có)
-                if (selectedGoalTypeCard != null) {
-                    resetCardBackground(selectedGoalTypeCard);
-                }
-
-                // Xác định CardView được nhấn và chọn nó
-                selectedGoalTypeCard = (CardView) v;
-                highlightCardBackground(selectedGoalTypeCard);
-
-                // Lưu tên loại mục tiêu dựa trên ID của CardView
-                int id = v.getId();
-                if (id == R.id.card_goal_type_toeic) {
-                    selectedGoalType = "Toeic";
-                } else if (id == R.id.card_goal_type_ielts) {
-                    selectedGoalType = "Ielts";
-                } else if (id == R.id.card_goal_type_reading) {
-                    selectedGoalType = "Đọc sách";
-                } else if (id == R.id.card_goal_type_exercise) {
-                    selectedGoalType = "Tập thể dục";
-                }
-            }
+        View.OnClickListener cardClickListener = v -> {
+            if (selectedGoalTypeCard != null) resetCardBackground(selectedGoalTypeCard);
+            selectedGoalTypeCard = (CardView) v;
+            highlightCardBackground(selectedGoalTypeCard);
+            int id = v.getId();
+            if (id == R.id.card_goal_type_toeic) selectedGoalType = "Toeic";
+            else if (id == R.id.card_goal_type_ielts) selectedGoalType = "Ielts";
+            else if (id == R.id.card_goal_type_reading) selectedGoalType = "Đọc sách";
+            else if (id == R.id.card_goal_type_exercise) selectedGoalType = "Tập thể dục";
         };
-
-        // Gán listener cho từng CardView
         cardGoalTypeToeic.setOnClickListener(cardClickListener);
         cardGoalTypeIelts.setOnClickListener(cardClickListener);
         cardGoalTypeReading.setOnClickListener(cardClickListener);
         cardGoalTypeExercise.setOnClickListener(cardClickListener);
     }
 
-    // Hàm đặt lại nền CardView (trở về trạng thái chưa chọn - nền trắng)
     private void resetCardBackground(CardView cardView) {
-        cardView.setCardBackgroundColor(Color.WHITE);
-        // Nếu bạn muốn viền xám, bạn cần dùng drawable selector cho background
+        cardView.setCardBackgroundColor(getResources().getColor(android.R.color.white));
     }
 
-    // Hàm làm nổi bật nền CardView (trạng thái đã chọn - nền xanh nhạt)
     private void highlightCardBackground(CardView cardView) {
-        // Lấy màu từ colors.xml thay vì hardcode
-        int highlightColor = getResources().getColor(R.color.colorCardCreateGoal); // Màu xanh nhạt
+        int highlightColor = getResources().getColor(R.color.colorCardCreateGoal);
         cardView.setCardBackgroundColor(highlightColor);
-        // Nếu bạn muốn viền xanh, bạn cần dùng drawable selector cho background
     }
 }

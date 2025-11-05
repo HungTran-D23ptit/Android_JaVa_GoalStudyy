@@ -57,7 +57,7 @@ public class TodayProgressFragment extends Fragment {
         SimpleDateFormat dateFormat = new SimpleDateFormat("EEEE, dd/MM/yyyy", new Locale("vi", "VN"));
         tvTodayDate.setText(dateFormat.format(today.getTime()));
 
-        // 2. Load dữ liệu (hiện tại là dữ liệu mẫu)
+        // 2. Load dữ liệu từ DB
         loadTaskData();
 
         // 3. Thiết lập RecyclerView và Adapter
@@ -74,15 +74,42 @@ public class TodayProgressFragment extends Fragment {
     }
 
 
-    // Hàm tạo dữ liệu mẫu (Sẽ thay thế bằng logic lấy dữ liệu thật sau này)
+    // Lấy dữ liệu thật cho hôm nay
     private void loadTaskData() {
         taskItems = new ArrayList<>();
-        // Dữ liệu mẫu giống trong ảnh
-        taskItems.add(new TodayTaskItem("Nghe TOEIC", "19:00 - 20:00", "Hoàn thành", "completed"));
-        taskItems.add(new TodayTaskItem("Nghỉ giải lao", "20:00 - 20:10", "Hoàn thành", "completed"));
-        taskItems.add(new TodayTaskItem("Đọc hiểu", "20:10 - 21:00", "Dời lịch", "postponed"));
-        taskItems.add(new TodayTaskItem("Từ vựng", "21:00 - 21:50", "Chưa bắt đầu", "pending"));
-        taskItems.add(new TodayTaskItem("Ôn tập ngữ pháp", "21:50 - 22:30", "Chưa bắt đầu", "pending")); // Thêm item cuối bị che
+        new Thread(() -> {
+            try {
+                com.example.goalmanagement.data.AppDatabase db = com.example.goalmanagement.data.AppDatabase.getInstance(requireContext().getApplicationContext());
+                java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault());
+                String dayKey = sdf.format(new java.util.Date());
+                java.util.List<com.example.goalmanagement.data.Task> tasks = db.taskDao().getByDay(dayKey);
+                java.text.SimpleDateFormat hm = new java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault());
+                for (com.example.goalmanagement.data.Task t : tasks) {
+                    String start = hm.format(new java.util.Date(t.startAtMillis));
+                    String end = hm.format(new java.util.Date(t.endAtMillis));
+                    String time = start + " - " + end;
+                    String statusText;
+                    switch (t.status) {
+                        case "completed": statusText = "Hoàn thành"; break;
+                        case "postponed": statusText = "Dời lịch"; break;
+                        case "inprogress": statusText = "Đang học"; break;
+                        case "pending": default: statusText = "Chưa bắt đầu"; break;
+                    }
+                    taskItems.add(new TodayTaskItem(t.title, time, statusText, t.status));
+                }
+                if (getActivity() != null) {
+                    getActivity().runOnUiThread(() -> {
+                        if (taskAdapter == null) {
+                            taskAdapter = new TodayTaskAdapter(getContext(), taskItems);
+                            rvTodayTasks.setLayoutManager(new androidx.recyclerview.widget.LinearLayoutManager(getContext()));
+                            rvTodayTasks.setAdapter(taskAdapter);
+                        } else {
+                            taskAdapter.updateData(taskItems);
+                        }
+                    });
+                }
+            } catch (Exception ignored) { }
+        }).start();
     }
 
     // --- PHẦN CLASS TodayTaskItem ĐÃ ĐƯỢC XÓA KHỎI ĐÂY ---

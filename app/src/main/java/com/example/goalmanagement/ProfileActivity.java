@@ -29,7 +29,6 @@ public class ProfileActivity extends AppCompatActivity {
     public static final String IS_LOGGED_IN_KEY = "IsLoggedIn";
     public static final String USER_NAME_KEY = "UserName";
     public static final String USER_EMAIL_KEY = "UserEmail";
-    public static final String USER_TOKEN_KEY = "UserToken";
     public static final String THEME_COLOR_KEY = "ThemeColor";
 
     @Override
@@ -59,9 +58,8 @@ public class ProfileActivity extends AppCompatActivity {
             showColorPickerDialog();
         });
 
-        // Xử lý Bottom Navigation
-        bottomNav = findViewById(R.id.bottom_navigation_profile);
-        setupBottomNavigation();
+        // Xử lý Bottom Navigation (layout hiện tại không có bottom nav)
+        bottomNav = null;
     }
 
     @Override
@@ -166,6 +164,7 @@ public class ProfileActivity extends AppCompatActivity {
         // XÓA dòng này khỏi setupBottomNavigation()
         // bottomNav.setSelectedItemId(R.id.nav_profile);
 
+        if (bottomNav == null) return; // không có bottom nav ở layout hiện tại
         bottomNav.setOnItemSelectedListener(item -> {
             int itemId = item.getItemId();
             Intent intent = null;

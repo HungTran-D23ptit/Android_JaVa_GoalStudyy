@@ -71,13 +71,37 @@ public class GoalsProgressFragment extends Fragment implements OnGoalClickListen
         });
     }
 
-    // Hàm tạo dữ liệu mẫu
+    // Hàm lấy dữ liệu thật từ Room
     private void loadGoalData() {
         goalItems = new ArrayList<>();
-        // Dùng class GoalItem từ file GoalItem.java
-        goalItems.add(new GoalItem("ic_toeic_logo", "TOEIC 800 điểm", "15/04/2025", 23, "82 ngày còn lại", "62/270 giờ học", "Đang tiến hành"));
-        goalItems.add(new GoalItem("ic_book", "Đọc 24 cuốn sách", "31/12/2025", 33, "350 ngày còn lại", "8/24 cuốn", "Đang tiến hành"));
-        goalItems.add(new GoalItem("ic_code", "Python cơ bản", "28/02/2025", 67, "45 ngày còn lại", "20/30 bài học", "Sắp hoàn thành"));
+        new Thread(() -> {
+            com.example.goalmanagement.data.AppDatabase db = com.example.goalmanagement.data.AppDatabase.getInstance(requireContext().getApplicationContext());
+            java.util.List<com.example.goalmanagement.data.Goal> goals = db.goalDao().getAll();
+            java.text.SimpleDateFormat df = new java.text.SimpleDateFormat("dd/MM/yyyy", java.util.Locale.getDefault());
+            long now = System.currentTimeMillis();
+            for (com.example.goalmanagement.data.Goal g : goals) {
+                int total = db.taskDao().countByGoal(g.id);
+                int completed = db.taskDao().countByGoalAndStatus(g.id, "completed");
+                int percentage = total > 0 ? (int) Math.round((completed * 100.0) / total) : 0;
+                long daysLeft = Math.max(0, (g.deadlineAtMillis - now) / (24L*60*60*1000));
+                String daysLeftStr = daysLeft + " ngày còn lại";
+                String deadlineStr = df.format(new java.util.Date(g.deadlineAtMillis));
+                String progressDetail = completed + "/" + total + " phiên";
+                String status = percentage >= 100 ? "Hoàn thành" : (percentage >= 70 ? "Sắp hoàn thành" : "Đang tiến hành");
+                goalItems.add(new GoalItem("ic_book", g.title, deadlineStr, percentage, daysLeftStr, progressDetail, status));
+            }
+            if (getActivity() != null) {
+                getActivity().runOnUiThread(() -> {
+                    if (goalAdapter == null) {
+                        goalAdapter = new GoalProgressAdapter(getContext(), goalItems, this);
+                        rvGoalsList.setLayoutManager(new LinearLayoutManager(getContext()));
+                        rvGoalsList.setAdapter(goalAdapter);
+                    } else {
+                        goalAdapter.notifyDataSetChanged();
+                    }
+                });
+            }
+        }).start();
     }
 
     // 3. THÊM HÀM onGoalClick ĐÃ IMPLEMENT (NHƯ TRONG ẢNH)
@@ -90,20 +114,3 @@ public class GoalsProgressFragment extends Fragment implements OnGoalClickListen
         bottomSheet.show(getParentFragmentManager(), bottomSheet.getTag());
     }
 
-    /* // Hàm ví dụ để hiển thị Dialog chi tiết (Giữ lại nếu bạn muốn tham khảo sau)
-    private void showGoalDetailDialog(GoalItem goal) {
-        AlertDialog.Builder builder = new AlertDialog.Builder(requireContext());
-        LayoutInflater inflater = requireActivity().getLayoutInflater();
-        View dialogView = inflater.inflate(R.layout.dialog_goal_detail, null); // Cần tạo layout dialog_goal_detail.xml
-
-        // Ánh xạ View trong dialog và set data từ 'goal'
-        // ...
-
-        builder.setView(dialogView)
-               .setPositiveButton("Đóng", (dialog, id) -> dialog.dismiss());
-        AlertDialog dialog = builder.create();
-        dialog.show();
-    }
-    */
-
-} // Kết thúc class GoalsProgressFragment

@@ -14,7 +14,7 @@ public class NotificationActivity extends AppCompatActivity {
 
     RecyclerView rvNotifications;
     NotificationAdapter adapter;
-    List<NotificationItem> notificationList;
+    List<Notification> notificationList;
     TextView btnMarkAllRead;
     ImageView btnBack;
 
@@ -49,34 +49,23 @@ public class NotificationActivity extends AppCompatActivity {
     // Tạo dữ liệu mẫu (Sau này sẽ lấy từ database)
     private void loadDummyData() {
         notificationList = new ArrayList<>();
-        notificationList.add(new NotificationItem(
-                "Nhắc nhở học tập",
+        notificationList.add(new Notification("Nhắc nhở học tập",
                 "Đã đến giờ học TOEIC Reading Practice (19:00)",
                 "5 phút trước",
                 "reminder",
-                false // false = chưa đọc
-        ));
-        notificationList.add(new NotificationItem(
-                "Báo cáo tuần",
+                false,
+                "Thứ 2 ngày 13/09/2025 • 11:50 AM"));
+        notificationList.add(new Notification("Báo cáo tuần",
                 "Tuần này bạn đã học 10.5 giờ, giảm 2 giờ so với tuần trước.",
                 "5 phút trước",
-                "warning", // Dùng icon cảnh báo
-                false
-        ));
-        notificationList.add(new NotificationItem(
-                "Cảnh báo tiến độ",
+                "report",
+                true,
+                "Chủ nhật ngày 12/09/2025 • 9:00 AM"));
+        notificationList.add(new Notification("Cảnh báo tiến độ",
                 "Bạn đã bỏ qua 2 task hôm nay. Điều này có thể ảnh hưởng đến mục tiêu.",
                 "5 phút trước",
-                "warning",
-                false
-        ));
-        // Ví dụ 1 item đã đọc
-        notificationList.add(new NotificationItem(
-                "Nhắc nhở cũ",
-                "Task 'Từ vựng' đã hoàn thành.",
-                "1 ngày trước",
-                "reminder",
-                true // true = đã đọc
-        ));
+                "progress",
+                false,
+                "Thứ 2 ngày 13/09/2025 • 7:30 AM"));
     }
 }

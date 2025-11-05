@@ -153,14 +153,32 @@ public class MainActivity extends AppCompatActivity implements ScheduleAdapter.O
      */
     private List<ScheduleItem> getTodaySchedule() {
         List<ScheduleItem> items = new ArrayList<>();
-        // TODO: Thay bằng logic lấy dữ liệu thật
+        try {
+            com.example.goalmanagement.data.AppDatabase db = com.example.goalmanagement.data.AppDatabase.getInstance(getApplicationContext());
+            java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault());
+            String dayKey = sdf.format(new java.util.Date());
+            java.util.List<com.example.goalmanagement.data.Task> tasks = db.taskDao().getByDay(dayKey);
+            java.text.SimpleDateFormat hm = new java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault());
+            long now = System.currentTimeMillis();
+            for (com.example.goalmanagement.data.Task t : tasks) {
+                String type = "Break".equalsIgnoreCase(t.subject) ? "rest" : "study";
+                String start = hm.format(new java.util.Date(t.startAtMillis));
+                String end = hm.format(new java.util.Date(t.endAtMillis));
+                String title = type.equals("rest") ? "Nghỉ ngơi" : t.title;
+                String desc = type.equals("rest") ? "" : t.subject;
+                items.add(new ScheduleItem(start, end, title, desc, type, t.id));
 
-        // --- TEST KỊCH BẢN 1: KHÔNG CÓ LỊCH ---
-        // return items;
-
-        // --- TEST KỊCH BẢN 2: CÓ LỊCH ---
-        items.add(new ScheduleItem("08:00", "09:00", "Toeic", "Học ngữ pháp part 5", "study"));
-        items.add(new ScheduleItem("09:00", "09:15", "Nghỉ ngơi", "", "rest"));
+                // Lên lịch nhắc nhở 10 phút trước khi bắt đầu cho task học sắp tới
+                if (type.equals("study") && t.startAtMillis > now && "pending".equalsIgnoreCase(t.status)) {
+                    com.example.goalmanagement.notifications.ReminderScheduler.scheduleReminder(
+                            getApplicationContext(),
+                            t.startAtMillis,
+                            "Sắp đến giờ học: " + t.title,
+                            "Bắt đầu lúc " + start
+                    );
+                }
+            }
+        } catch (Exception ignored) { }
         return items;
     }
 
@@ -262,6 +280,55 @@ public class MainActivity extends AppCompatActivity implements ScheduleAdapter.O
                 startActivity(intent);
             });
         }
+
+        if (createTaskCard != null) {
+            createTaskCard.setOnClickListener(v -> showQuickAddTaskDialog());
+        }
+    }
+
+    private void showQuickAddTaskDialog() {
+        android.view.LayoutInflater inflater = android.view.LayoutInflater.from(this);
+        android.view.View view = inflater.inflate(R.layout.dialog_quick_add_task, null);
+        final android.widget.EditText etTitle = view.findViewById(R.id.et_quick_task_title);
+        final android.widget.EditText etSubject = view.findViewById(R.id.et_quick_task_subject);
+        final android.widget.EditText etStart = view.findViewById(R.id.et_quick_task_start);
+        final android.widget.EditText etDuration = view.findViewById(R.id.et_quick_task_duration);
+
+        new AlertDialog.Builder(this)
+                .setTitle("Thêm task hôm nay")
+                .setView(view)
+                .setPositiveButton("Lưu", (d, w) -> {
+                    String title = etTitle.getText().toString().trim();
+                    String subject = etSubject.getText().toString().trim();
+                    String startHm = etStart.getText().toString().trim();
+                    String durStr = etDuration.getText().toString().trim();
+                    if (title.isEmpty() || startHm.isEmpty() || durStr.isEmpty()) {
+                        Toast.makeText(this, "Vui lòng nhập đầy đủ", Toast.LENGTH_SHORT).show();
+                        return;
+                    }
+                    try {
+                        int duration = Integer.parseInt(durStr);
+                        java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault());
+                        String dayKey = sdf.format(new java.util.Date());
+                        java.util.Calendar cal = java.util.Calendar.getInstance();
+                        String[] hm = startHm.split(":");
+                        cal.set(java.util.Calendar.HOUR_OF_DAY, Integer.parseInt(hm[0]));
+                        cal.set(java.util.Calendar.MINUTE, Integer.parseInt(hm[1]));
+                        cal.set(java.util.Calendar.SECOND, 0);
+                        cal.set(java.util.Calendar.MILLISECOND, 0);
+                        long start = cal.getTimeInMillis();
+                        long end = start + duration * 60L * 1000L;
+                        com.example.goalmanagement.data.Task t = new com.example.goalmanagement.data.Task(0, title, subject.isEmpty()?title:subject, start, end, duration, dayKey, "pending");
+                        new Thread(() -> {
+                            com.example.goalmanagement.data.AppDatabase.getInstance(getApplicationContext()).taskDao().insert(t);
+                            runOnUiThread(this::loadDataAndUpdateUI);
+                        }).start();
+                    } catch (Exception e) {
+                        Toast.makeText(this, "Dữ liệu không hợp lệ", Toast.LENGTH_SHORT).show();
+                    }
+                })
+                .setNegativeButton("Hủy", null)
+                .show();
     }
 
     /**
@@ -320,8 +387,53 @@ public class MainActivity extends AppCompatActivity implements ScheduleAdapter.O
     public void onEditClick(int position) {
         if (position >= 0 && position < todayScheduleList.size()) {
             ScheduleItem item = todayScheduleList.get(position);
-            Toast.makeText(this, "Sửa: " + item.title, Toast.LENGTH_SHORT).show();
-            // TODO: Mở màn hình Sửa
+            String[] options = new String[]{"Đánh dấu hoàn thành", "Đánh dấu chưa hoàn thành", "Dời sang ngày mai", "Bắt đầu học"};
+            new AlertDialog.Builder(this)
+                    .setTitle(item.title)
+                    .setItems(options, (d, which) -> {
+                        long taskId = item.taskId;
+                        if (taskId <= 0) {
+                            Toast.makeText(this, "Task mẫu, không chỉnh sửa được", Toast.LENGTH_SHORT).show();
+                            return;
+                        }
+                        if (which == 0) { // complete
+                            new Thread(() -> {
+                                com.example.goalmanagement.data.AppDatabase.getInstance(getApplicationContext()).taskDao().updateStatus(taskId, "completed");
+                                runOnUiThread(this::loadDataAndUpdateUI);
+                            }).start();
+                        } else if (which == 1) { // pending
+                            new Thread(() -> {
+                                com.example.goalmanagement.data.AppDatabase.getInstance(getApplicationContext()).taskDao().updateStatus(taskId, "pending");
+                                runOnUiThread(this::loadDataAndUpdateUI);
+                            }).start();
+                        } else if (which == 2) { // postpone
+                            new Thread(() -> {
+                                com.example.goalmanagement.data.AppDatabase db = com.example.goalmanagement.data.AppDatabase.getInstance(getApplicationContext());
+                                com.example.goalmanagement.data.Task t = db.taskDao().getById(taskId);
+                                if (t != null) {
+                                    db.taskDao().updateStatus(taskId, "postponed");
+                                    long oneDay = 24L*60L*60L*1000L;
+                                    com.example.goalmanagement.data.Task nt = new com.example.goalmanagement.data.Task(t.goalId, t.title, t.subject, t.startAtMillis+oneDay, t.endAtMillis+oneDay, t.durationMinutes, getNextDayKey(t.dayKey), "pending");
+                                    db.taskDao().insert(nt);
+                                }
+                                runOnUiThread(this::loadDataAndUpdateUI);
+                            }).start();
+                        } else if (which == 3) { // start study
+                            Intent intent = new Intent(MainActivity.this, StudyModeActivity.class);
+                            intent.putExtra("TASK_NAME", item.title);
+                            intent.putExtra("TASK_ID", taskId);
+                            // Estimate duration from DB
+                            new Thread(() -> {
+                                com.example.goalmanagement.data.Task t = com.example.goalmanagement.data.AppDatabase.getInstance(getApplicationContext()).taskDao().getById(taskId);
+                                long minutes = (t != null) ? t.durationMinutes : 0;
+                                runOnUiThread(() -> {
+                                    intent.putExtra("TASK_DURATION_MINUTES", minutes);
+                                    startActivity(intent);
+                                });
+                            }).start();
+                        }
+                    })
+                    .show();
         }
     }
 
@@ -333,16 +445,32 @@ public class MainActivity extends AppCompatActivity implements ScheduleAdapter.O
                     .setTitle("Xác nhận xóa")
                     .setMessage("Bạn có chắc muốn xóa '" + item.title + "'?")
                     .setPositiveButton("Xóa", (dialog, which) -> {
-                        todayScheduleList.remove(position);
-                        homeScheduleAdapter.notifyItemRemoved(position);
-                        homeScheduleAdapter.notifyItemRangeChanged(position, todayScheduleList.size());
-                        Toast.makeText(this, "Đã xóa", Toast.LENGTH_SHORT).show();
-                        if (todayScheduleList.isEmpty()) {
-                            loadDataAndUpdateUI();
+                        long taskId = item.taskId;
+                        if (taskId > 0) {
+                            new Thread(() -> {
+                                com.example.goalmanagement.data.AppDatabase.getInstance(getApplicationContext()).taskDao().deleteById(taskId);
+                                runOnUiThread(this::loadDataAndUpdateUI);
+                            }).start();
+                        } else {
+                            todayScheduleList.remove(position);
+                            homeScheduleAdapter.notifyItemRemoved(position);
+                            homeScheduleAdapter.notifyItemRangeChanged(position, todayScheduleList.size());
+                            if (todayScheduleList.isEmpty()) loadDataAndUpdateUI();
                         }
                     })
                     .setNegativeButton("Hủy", null)
                     .show();
         }
+    }
+
+    private String getNextDayKey(String dayKey) {
+        try {
+            java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault());
+            java.util.Date d = sdf.parse(dayKey);
+            java.util.Calendar c = java.util.Calendar.getInstance();
+            c.setTime(d);
+            c.add(java.util.Calendar.DATE, 1);
+            return sdf.format(c.getTime());
+        } catch (Exception e) { return dayKey; }
     }
 }

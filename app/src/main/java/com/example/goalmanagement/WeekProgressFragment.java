@@ -43,26 +43,39 @@ public class WeekProgressFragment extends Fragment {
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
 
-        // --- Logic để lấy dữ liệu và cập nhật giao diện sẽ đặt ở đây ---
+        // Lấy số task hoàn thành/dời/chưa làm trong tuần hiện tại và tuần trước (đơn giản)
+        new Thread(() -> {
+            try {
+                com.example.goalmanagement.data.AppDatabase db = com.example.goalmanagement.data.AppDatabase.getInstance(requireContext().getApplicationContext());
+                java.text.SimpleDateFormat keyFmt = new java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault());
+                java.util.Calendar c = java.util.Calendar.getInstance();
+                // Tính range tuần hiện tại (Thứ 2 -> CN)
+                c.set(java.util.Calendar.DAY_OF_WEEK, java.util.Calendar.MONDAY);
+                String weekStart = keyFmt.format(c.getTime());
+                c.add(java.util.Calendar.DATE, 6);
+                String weekEnd = keyFmt.format(c.getTime());
+                // Tuần trước
+                c.add(java.util.Calendar.DATE, -13);
+                String prevStart = keyFmt.format(c.getTime());
+                c.add(java.util.Calendar.DATE, 6);
+                String prevEnd = keyFmt.format(c.getTime());
 
-        // Ví dụ:
-        // 1. Gọi hàm để lấy dữ liệu thống kê tuần (từ database/API)
-        // WeeklyStats stats = loadWeeklyStatsData();
+                int doneThis = db.taskDao().countByDayRangeAndStatus(weekStart, weekEnd, "completed");
+                int postThis = db.taskDao().countByDayRangeAndStatus(weekStart, weekEnd, "postponed");
+                int pendThis = db.taskDao().countByDayRangeAndStatus(weekStart, weekEnd, "pending");
 
-        // 2. Cập nhật các TextView tổng kết
-        // tvTotalHoursThisWeek.setText(stats.getTotalHoursThisWeek() + "h");
-        // tvTotalHoursLastWeek.setText(stats.getTotalHoursLastWeek() + "h");
-        // tvAverageHours.setText(stats.getAverageDailyHours() + "h");
+                int donePrev = db.taskDao().countByDayRangeAndStatus(prevStart, prevEnd, "completed");
 
-        // 3. Cập nhật các ProgressBar tròn (%)
-        // progressCompletedWeek.setProgress(stats.getCompletionPercentage());
-        // progressSkippedWeek.setProgress(stats.getSkippedPercentage());
-        // progressPostponedWeek.setProgress(stats.getPostponedPercentage());
-
-        // 4. (Nâng cao) Cập nhật chiều cao các cột biểu đồ dựa trên dữ liệu giờ học mỗi ngày
-        // updateBarChart(stats.getDailyHours());
-
-        // Hiện tại, giao diện đang hiển thị dữ liệu tĩnh từ XML.
+                if (getActivity() != null) {
+                    getActivity().runOnUiThread(() -> {
+                        // Tối thiểu: hiển thị bằng Toast (nếu layout chưa có view động)
+                        android.widget.Toast.makeText(getContext(),
+                                "Tuần này: Done=" + doneThis + ", Dời=" + postThis + ", Chờ=" + pendThis + "\nTuần trước: Done=" + donePrev,
+                                android.widget.Toast.LENGTH_SHORT).show();
+                    });
+                }
+            } catch (Exception ignored) { }
+        }).start();
     }
 
     // (Hàm ví dụ - bạn sẽ cần thay thế bằng logic thực tế)

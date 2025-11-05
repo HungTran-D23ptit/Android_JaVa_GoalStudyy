@@ -43,11 +43,21 @@ public class SettingsActivity extends AppCompatActivity {
         // Cấu hình Spinner "Nghỉ giữa task"
         setupBreakTimeSpinner();
 
-        // TODO: Thêm logic lưu/tải trạng thái của các Switch (dùng SharedPreferences)
-        switchPomodoro.setOnCheckedChangeListener((buttonView, isChecked) -> {
-            // Xử lý khi gạt nút Pomodoro
-            Toast.makeText(this, "Pomodoro: " + isChecked, Toast.LENGTH_SHORT).show();
-        });
+        // Lưu/tải trạng thái của các Switch (SharedPreferences)
+        android.content.SharedPreferences prefs = getSharedPreferences(ProfileActivity.PREFS_NAME, MODE_PRIVATE);
+        switchPomodoro.setChecked(prefs.getBoolean("pref_pomodoro", false));
+        switchAutoPostpone.setChecked(prefs.getBoolean("pref_auto_postpone", true));
+        switchReminders.setChecked(prefs.getBoolean("pref_reminders", true));
+        switchWeeklyReport.setChecked(prefs.getBoolean("pref_weekly_report", true));
+        switchGoalWarnings.setChecked(prefs.getBoolean("pref_goal_warnings", true));
+        switchAchievements.setChecked(prefs.getBoolean("pref_achievements", true));
+
+        switchPomodoro.setOnCheckedChangeListener((buttonView, isChecked) -> prefs.edit().putBoolean("pref_pomodoro", isChecked).apply());
+        switchAutoPostpone.setOnCheckedChangeListener((b, v) -> prefs.edit().putBoolean("pref_auto_postpone", v).apply());
+        switchReminders.setOnCheckedChangeListener((b, v) -> prefs.edit().putBoolean("pref_reminders", v).apply());
+        switchWeeklyReport.setOnCheckedChangeListener((b, v) -> prefs.edit().putBoolean("pref_weekly_report", v).apply());
+        switchGoalWarnings.setOnCheckedChangeListener((b, v) -> prefs.edit().putBoolean("pref_goal_warnings", v).apply());
+        switchAchievements.setOnCheckedChangeListener((b, v) -> prefs.edit().putBoolean("pref_achievements", v).apply());
 
         tvGoogleCalendarStatus.setOnClickListener(v -> {
             // TODO: Xử lý logic kết nối Google Calendar
@@ -67,7 +77,17 @@ public class SettingsActivity extends AppCompatActivity {
         adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
         spinnerBreakTime.setAdapter(adapter);
 
-        // TODO: Tải và đặt giá trị đã lưu cho Spinner (dùng SharedPreferences)
-        // spinnerBreakTime.setSelection(đã_lưu);
+        android.content.SharedPreferences prefs = getSharedPreferences(ProfileActivity.PREFS_NAME, MODE_PRIVATE);
+        int saved = prefs.getInt("pref_break_minutes", 10);
+        int index = 1; // mặc định 10 phút
+        if (saved == 5) index = 0; else if (saved == 10) index = 1; else if (saved == 15) index = 2; else if (saved == 0) index = 3;
+        spinnerBreakTime.setSelection(index);
+        spinnerBreakTime.setOnItemSelectedListener(new android.widget.AdapterView.OnItemSelectedListener() {
+            @Override public void onItemSelected(android.widget.AdapterView<?> parent, View view, int pos, long id) {
+                int minutes = pos==0?5: pos==1?10: pos==2?15:0;
+                prefs.edit().putInt("pref_break_minutes", minutes).apply();
+            }
+            @Override public void onNothingSelected(android.widget.AdapterView<?> parent) {}
+        });
     }
 }

@@ -18,15 +18,20 @@ class ScheduleItem {
     String endTime;
     String title;
     String description;
-    String type; // Ví dụ: "study", "rest"
+    String type; // "study" | "rest"
+    long taskId; // id trong DB (nếu có), -1 nếu dữ liệu demo
 
-    // Constructor (giữ nguyên)
     public ScheduleItem(String startTime, String endTime, String title, String description, String type) {
+        this(startTime, endTime, title, description, type, -1);
+    }
+
+    public ScheduleItem(String startTime, String endTime, String title, String description, String type, long taskId) {
         this.startTime = startTime;
         this.endTime = endTime;
         this.title = title;
         this.description = description;
         this.type = type;
+        this.taskId = taskId;
     }
 }
 
@@ -119,6 +124,15 @@ public class ScheduleAdapter extends RecyclerView.Adapter<ScheduleAdapter.ViewHo
             // Kiểm tra listener và vị trí hợp lệ trước khi gọi
             if (listener != null && holder.getAdapterPosition() != RecyclerView.NO_POSITION) {
                 listener.onDeleteClick(holder.getAdapterPosition()); // Gọi hàm onDeleteClick của Activity
+            }
+        });
+
+        // Nhấn vào item để bắt đầu học nếu là phiên học
+        holder.itemView.setOnClickListener(v -> {
+            if ("study".equalsIgnoreCase(item.type)) {
+                android.content.Intent intent = new android.content.Intent(context, StudyModeActivity.class);
+                intent.putExtra("TASK_NAME", item.title);
+                context.startActivity(intent);
             }
         });
     }

@@ -290,14 +290,14 @@
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="Thời gian mục tiêu *"
+                        android:text="Ngày hoàn thành *"
                         android:textColor="@color/black"
                         android:textSize="16sp"/>
                     <EditText
                         android:id="@+id/et_goal_time"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:hint="--:--"
+                        android:hint="dd.MM.yyyy"
                         android:drawableStart="@drawable/ic_schedule"
                         android:drawablePadding="8dp"
                         android:focusable="false"
@@ -322,7 +322,7 @@
                         android:id="@+id/et_hours_per_day"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:hint="--:--"
+                        android:hint="HH:mm"
                         android:drawableStart="@drawable/ic_time"
                         android:drawablePadding="8dp"
                         android:focusable="false"

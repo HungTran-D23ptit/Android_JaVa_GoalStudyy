@@ -52,10 +52,30 @@ public class ScheduleSettingsActivity extends AppCompatActivity {
         });
 
         btnCreateFixedSchedule.setOnClickListener(v -> {
-            // TODO: Thêm logic kiểm tra và lưu lịch sinh hoạt
-            // ...
-            Toast.makeText(this, "Đã tạo lịch sinh hoạt", Toast.LENGTH_SHORT).show();
-            finish(); // Đóng Activity sau khi tạo
+            try {
+                int studyStart = parseHmToMinutes(etFreeTimeStart.getText().toString());
+                int studyEnd = parseHmToMinutes(etFreeTimeEnd.getText().toString());
+                int breakMinutes = parseHmToMinutes(etBreakDuration.getText().toString());
+                if (studyEnd <= studyStart) {
+                    Toast.makeText(this, "Giờ kết thúc phải sau giờ bắt đầu", Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                com.example.goalmanagement.data.AppDatabase db = com.example.goalmanagement.data.AppDatabase.getInstance(getApplicationContext());
+                com.example.goalmanagement.data.Routine routine = db.routineDao().getSingle();
+                if (routine == null) {
+                    routine = new com.example.goalmanagement.data.Routine(420, 1380, studyStart, studyEnd, Math.max(5, breakMinutes));
+                    db.routineDao().insert(routine);
+                } else {
+                    routine.studyStartMinutesOfDay = studyStart;
+                    routine.studyEndMinutesOfDay = studyEnd;
+                    routine.breakMinutes = Math.max(5, breakMinutes);
+                    db.routineDao().update(routine);
+                }
+                Toast.makeText(this, "Đã lưu routine", Toast.LENGTH_SHORT).show();
+                finish();
+            } catch (Exception e) {
+                Toast.makeText(this, "Vui lòng nhập thời gian hợp lệ (HH:mm)", Toast.LENGTH_SHORT).show();
+            }
         });
     }
 
@@ -86,5 +106,12 @@ public class ScheduleSettingsActivity extends AppCompatActivity {
                     }, mHour, mMinute, true); // true = 24 giờ
             timePickerDialog.show();
         });
+    }
+
+    private int parseHmToMinutes(String hm) {
+        String[] parts = hm.split(":");
+        int h = Integer.parseInt(parts[0]);
+        int m = Integer.parseInt(parts[1]);
+        return h * 60 + m;
     }
 }
