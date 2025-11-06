@@ -95,6 +95,8 @@ public class ScheduleActivity extends AppCompatActivity implements
         if (bottomNav != null) {
             bottomNav.setSelectedItemId(R.id.nav_schedule); // Đặt lại tab khi quay về
         }
+        // Refresh schedule data when returning to this activity
+        setupScheduleList(selectedDate);
     }
 
     private void setupNotificationButton() {
@@ -170,19 +172,34 @@ public class ScheduleActivity extends AppCompatActivity implements
             scheduleDataList.add(new ScheduleItem(startTime, endTime, newName, newContent, "study"));
             intent.removeExtra("NEW_TASK_NAME");
         }
-        if (scheduleDataList.isEmpty() && isSameDay(date, Calendar.getInstance())) {
-            scheduleDataList.add(new ScheduleItem("08:00", "09:00", "Làm bài tập Anh", "Unit 5 Workbook", "study"));
-            scheduleDataList.add(new ScheduleItem("09:00", "09:15", "Nghỉ ngơi", "Uống nước, đi lại", "rest"));
-        } else if (scheduleDataList.isEmpty()) {
-            SimpleDateFormat dateFormat = new SimpleDateFormat("dd/MM", Locale.getDefault());
-        }
-        if (scheduleAdapter == null) {
-            scheduleAdapter = new ScheduleAdapter(this, scheduleDataList, this);
-            rvScheduleItems.setLayoutManager(new LinearLayoutManager(this));
-            rvScheduleItems.setAdapter(scheduleAdapter);
-        } else {
-            scheduleAdapter.updateData(scheduleDataList);
-        }
+
+        // Load real tasks from database for the selected date
+        new Thread(() -> {
+            try {
+                com.example.goalmanagement.data.AppDatabase db = com.example.goalmanagement.data.AppDatabase.getInstance(getApplicationContext());
+                java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault());
+                String dayKey = sdf.format(date.getTime());
+                java.util.List<com.example.goalmanagement.data.Task> tasks = db.taskDao().getByDay(dayKey);
+                java.text.SimpleDateFormat hm = new java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault());
+                for (com.example.goalmanagement.data.Task t : tasks) {
+                    String type = "Break".equalsIgnoreCase(t.subject) ? "rest" : "study";
+                    String start = hm.format(new java.util.Date(t.startAtMillis));
+                    String end = hm.format(new java.util.Date(t.endAtMillis));
+                    String title = type.equals("rest") ? "Nghỉ ngơi" : t.title;
+                    String desc = type.equals("rest") ? "" : t.subject;
+                    scheduleDataList.add(new ScheduleItem(start, end, title, desc, type, t.id));
+                }
+            } catch (Exception ignored) { }
+            runOnUiThread(() -> {
+                if (scheduleAdapter == null) {
+                    scheduleAdapter = new ScheduleAdapter(this, scheduleDataList, this);
+                    rvScheduleItems.setLayoutManager(new LinearLayoutManager(this));
+                    rvScheduleItems.setAdapter(scheduleAdapter);
+                } else {
+                    scheduleAdapter.updateData(scheduleDataList);
+                }
+            });
+        }).start();
     }
     private String calculateEndTime(String startTime, int durationHours) {
         try {

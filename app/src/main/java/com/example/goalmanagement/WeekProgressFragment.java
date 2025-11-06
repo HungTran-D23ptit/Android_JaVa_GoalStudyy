@@ -7,17 +7,17 @@ import androidx.fragment.app.Fragment;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-// Import thêm các View bạn cần ánh xạ, ví dụ: import android.widget.TextView; import android.widget.ProgressBar;
+import android.widget.ProgressBar;
+import android.widget.TextView;
 
 /**
  * Fragment để hiển thị tiến độ học tập theo tuần.
  */
 public class WeekProgressFragment extends Fragment {
 
-    // TODO: Khai báo các biến View cần cập nhật dữ liệu
-    // Ví dụ:
-    // TextView tvTotalHoursThisWeek, tvTotalHoursLastWeek, tvAverageHours;
-    // ProgressBar progressCompletedWeek, progressSkippedWeek, progressPostponedWeek;
+    // Khai báo các biến View cần cập nhật dữ liệu
+    TextView tvTotalHoursThisWeek, tvTotalHoursLastWeek, tvAverageHours;
+    ProgressBar progressCompletedWeek, progressSkippedWeek, progressPostponedWeek;
     // Các View cho cột biểu đồ (nếu cần thay đổi chiều cao động)
 
     // Constructor rỗng là bắt buộc
@@ -30,11 +30,10 @@ public class WeekProgressFragment extends Fragment {
         // Inflate layout (nạp giao diện) cho Fragment này
         View view = inflater.inflate(R.layout.fragment_week_progress, container, false);
 
-        // --- Ánh xạ View nên thực hiện ở đây hoặc trong onViewCreated ---
-        // Ví dụ:
-        // tvTotalHoursThisWeek = view.findViewById(R.id.tv_total_hours_this_week); // Giả sử bạn thêm ID này
-        // progressCompletedWeek = view.findViewById(R.id.progress_completed_week);
-        // ... ánh xạ các View khác
+        // Ánh xạ View
+        progressCompletedWeek = view.findViewById(R.id.progress_completed_week);
+        progressSkippedWeek = view.findViewById(R.id.progress_skipped_week);
+        progressPostponedWeek = view.findViewById(R.id.progress_postponed_week);
 
         return view; // Trả về View đã được tạo
     }
@@ -66,12 +65,21 @@ public class WeekProgressFragment extends Fragment {
 
                 int donePrev = db.taskDao().countByDayRangeAndStatus(prevStart, prevEnd, "completed");
 
+                int totalThis = doneThis + postThis + pendThis;
+                int skippedThis = pendThis; // Assuming skipped is pending, adjust as needed
+
                 if (getActivity() != null) {
                     getActivity().runOnUiThread(() -> {
-                        // Tối thiểu: hiển thị bằng Toast (nếu layout chưa có view động)
-                        android.widget.Toast.makeText(getContext(),
-                                "Tuần này: Done=" + doneThis + ", Dời=" + postThis + ", Chờ=" + pendThis + "\nTuần trước: Done=" + donePrev,
-                                android.widget.Toast.LENGTH_SHORT).show();
+                        // Update ProgressBars
+                        if (progressCompletedWeek != null && totalThis > 0) {
+                            progressCompletedWeek.setProgress((doneThis * 100) / totalThis);
+                        }
+                        if (progressPostponedWeek != null && totalThis > 0) {
+                            progressPostponedWeek.setProgress((postThis * 100) / totalThis);
+                        }
+                        if (progressSkippedWeek != null && totalThis > 0) {
+                            progressSkippedWeek.setProgress((skippedThis * 100) / totalThis);
+                        }
                     });
                 }
             } catch (Exception ignored) { }
@@ -83,6 +91,13 @@ public class WeekProgressFragment extends Fragment {
     //     // ... Lấy dữ liệu từ nguồn ...
     //     return new WeeklyStats(...);
     // }
+
+    @Override
+    public void onResume() {
+        super.onResume();
+        // Refresh data when returning to this tab
+        onViewCreated(getView(), null);
+    }
 
     // (Hàm ví dụ - bạn sẽ cần thay thế bằng logic thực tế)
     // private void updateBarChart(float[] dailyHours) {

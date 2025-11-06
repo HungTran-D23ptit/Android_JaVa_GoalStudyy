@@ -38,6 +38,9 @@ public interface TaskDao {
 
     @Query("SELECT COUNT(*) FROM tasks WHERE dayKey BETWEEN :fromDay AND :toDay AND status=:status")
     int countByDayRangeAndStatus(String fromDay, String toDay, String status);
+
+    @Query("SELECT COUNT(*) FROM tasks WHERE dayKey=:dayKey AND status=:status")
+    int countByDayAndStatus(String dayKey, String status);
 }
 
 

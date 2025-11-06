@@ -56,9 +56,30 @@ public class MainActivity extends AppCompatActivity implements ScheduleAdapter.O
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_main);
 
+        // Kiểm tra trạng thái đăng nhập
         sharedPrefs = getSharedPreferences(ProfileActivity.PREFS_NAME, MODE_PRIVATE);
+        boolean isLoggedIn = sharedPrefs.getBoolean(ProfileActivity.IS_LOGGED_IN_KEY, false);
+
+        if (!isLoggedIn) {
+            // Chưa đăng nhập, chuyển đến LoginActivity
+            Intent intent = new Intent(MainActivity.this, LoginActivity.class);
+            startActivity(intent);
+            finish(); // Đóng MainActivity để không quay lại được
+            return;
+        }
+
+        // Kiểm tra routine đã setup chưa
+        boolean routineSetupCompleted = sharedPrefs.getBoolean("ROUTINE_SETUP_COMPLETED", false);
+        if (!routineSetupCompleted) {
+            // Chưa setup routine, chuyển đến RoutineSetupActivity
+            Intent intent = new Intent(MainActivity.this, RoutineSetupActivity.class);
+            startActivity(intent);
+            finish(); // Đóng MainActivity để không quay lại được
+            return;
+        }
+
+        setContentView(R.layout.activity_main);
 
         // Ánh xạ View
         bottomNav = findViewById(R.id.bottom_navigation);
@@ -91,6 +112,10 @@ public class MainActivity extends AppCompatActivity implements ScheduleAdapter.O
     protected void onResume() {
         super.onResume();
         loadDataAndUpdateUI(); // Hàm tổng hợp
+
+        // Kiểm tra task bị bỏ lỡ khi app resume
+        MissedTaskChecker checker = new MissedTaskChecker(this);
+        checker.checkAndNotifyMissedTasks();
     }
 
     /**
@@ -189,11 +214,29 @@ public class MainActivity extends AppCompatActivity implements ScheduleAdapter.O
     private void updateHeaderUI() {
         boolean isLoggedIn = sharedPrefs.getBoolean(ProfileActivity.IS_LOGGED_IN_KEY, false);
         if (isLoggedIn) {
-            String userName = sharedPrefs.getString(ProfileActivity.USER_NAME_KEY, "Bạn");
-            tvWelcomeMessage.setText("Chúc bạn ngày mới vui vẻ");
-            tvUserName.setText(userName);
-            tvUserName.setVisibility(View.VISIBLE);
-            imgAvatar.setImageResource(R.drawable.ic_avatar_placeholder);
+            String userEmail = sharedPrefs.getString(ProfileActivity.USER_EMAIL_KEY, "");
+            if (!userEmail.isEmpty()) {
+                new Thread(() -> {
+                    com.example.goalmanagement.data.AppDatabase db = com.example.goalmanagement.data.AppDatabase.getInstance(getApplicationContext());
+                    com.example.goalmanagement.data.User user = db.userDao().getByEmail(userEmail);
+                    runOnUiThread(() -> {
+                        if (user != null) {
+                            tvWelcomeMessage.setText("Chúc bạn ngày mới vui vẻ");
+                            tvUserName.setText(user.name);
+                            tvUserName.setVisibility(View.VISIBLE);
+                            imgAvatar.setImageResource(R.drawable.ic_avatar_placeholder);
+                        } else {
+                            // User not found, logout
+                            sharedPrefs.edit().putBoolean(ProfileActivity.IS_LOGGED_IN_KEY, false).apply();
+                            updateHeaderUI();
+                        }
+                    });
+                }).start();
+            } else {
+                // No email, logout
+                sharedPrefs.edit().putBoolean(ProfileActivity.IS_LOGGED_IN_KEY, false).apply();
+                updateHeaderUI();
+            }
         } else {
             tvWelcomeMessage.setText("Hãy đăng nhập tài khoản");
             tvUserName.setVisibility(View.GONE);

@@ -83,7 +83,7 @@ public class GoalsProgressFragment extends Fragment implements OnGoalClickListen
                 int total = db.taskDao().countByGoal(g.id);
                 int completed = db.taskDao().countByGoalAndStatus(g.id, "completed");
                 int percentage = total > 0 ? (int) Math.round((completed * 100.0) / total) : 0;
-                long daysLeft = Math.max(0, (g.deadlineAtMillis - now) / (24L*60*60*1000));
+                long daysLeft = Math.max(0, (g.deadlineAtMillis - now) / (24L * 60 * 60 * 1000));
                 String daysLeftStr = daysLeft + " ngày còn lại";
                 String deadlineStr = df.format(new java.util.Date(g.deadlineAtMillis));
                 String progressDetail = completed + "/" + total + " phiên";
@@ -114,3 +114,9 @@ public class GoalsProgressFragment extends Fragment implements OnGoalClickListen
         bottomSheet.show(getParentFragmentManager(), bottomSheet.getTag());
     }
 
+    @Override
+    public void onResume() {
+        super.onResume();
+        loadGoalData();
+    }
+}

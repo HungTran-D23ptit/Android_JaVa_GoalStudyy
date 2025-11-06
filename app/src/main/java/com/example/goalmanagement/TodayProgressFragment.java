@@ -9,6 +9,8 @@ import androidx.recyclerview.widget.RecyclerView;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.LinearLayout;
+import android.widget.ProgressBar;
 import android.widget.TextView;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -25,7 +27,9 @@ public class TodayProgressFragment extends Fragment {
     RecyclerView rvTodayTasks;
     TodayTaskAdapter taskAdapter; // Adapter này đã được tạo ở bước trước
     List<TodayTaskItem> taskItems; // Danh sách chứa dữ liệu các task
-    TextView tvTodayDate;
+    TextView tvTodayDate, tvStreakNumber, tvStreakLabel, tvTasksCount;
+    ProgressBar progressCompleted, progressSkipped, progressPostponed, progressTasksToday;
+    LinearLayout llStreakDays;
     // TODO: Khai báo thêm các View khác nếu cần (ví dụ: ProgressBar, TextView streak...)
 
     // Constructor rỗng là bắt buộc
@@ -41,7 +45,14 @@ public class TodayProgressFragment extends Fragment {
         // Ánh xạ các View từ layout
         rvTodayTasks = view.findViewById(R.id.rv_today_tasks);
         tvTodayDate = view.findViewById(R.id.tv_today_date);
-        // TODO: Ánh xạ các View khác (ProgressBar, TextView streak...)
+        tvStreakNumber = view.findViewById(R.id.tv_streak_number);
+        tvStreakLabel = view.findViewById(R.id.tv_streak_label);
+        llStreakDays = view.findViewById(R.id.ll_streak_days);
+        progressCompleted = view.findViewById(R.id.progress_completed);
+        progressSkipped = view.findViewById(R.id.progress_skipped);
+        progressPostponed = view.findViewById(R.id.progress_postponed);
+        progressTasksToday = view.findViewById(R.id.progress_tasks_today);
+        tvTasksCount = view.findViewById(R.id.tv_tasks_count);
 
         return view; // Trả về View đã được tạo
     }
@@ -70,7 +81,7 @@ public class TodayProgressFragment extends Fragment {
             rvTodayTasks.setAdapter(taskAdapter);
         }
 
-        // TODO: Cập nhật giao diện cho Streak, ProgressBar thống kê...
+        // Cập nhật Streak, ProgressBars, và task count sẽ được thực hiện trong loadTaskData sau khi dữ liệu được load
     }
 
 
@@ -97,6 +108,10 @@ public class TodayProgressFragment extends Fragment {
                     }
                     taskItems.add(new TodayTaskItem(t.title, time, statusText, t.status));
                 }
+
+                // Tính streak thực tế
+                int streak = calculateStreak(db, sdf);
+
                 if (getActivity() != null) {
                     getActivity().runOnUiThread(() -> {
                         if (taskAdapter == null) {
@@ -106,10 +121,56 @@ public class TodayProgressFragment extends Fragment {
                         } else {
                             taskAdapter.updateData(taskItems);
                         }
+
+                        // Cập nhật Streak thực tế
+                        if (tvStreakNumber != null) tvStreakNumber.setText(String.valueOf(streak));
+                        if (tvStreakLabel != null) tvStreakLabel.setText("Ngày học liên tiếp");
+
+                        // Cập nhật ProgressBars dựa trên dữ liệu thực
+                        int totalTasks = taskItems.size();
+                        int completedTasks = 0;
+                        int postponedTasks = 0;
+                        int skippedTasks = 0; // Assuming skipped is pending
+                        for (TodayTaskItem item : taskItems) {
+                            if ("Hoàn thành".equals(item.statusText)) completedTasks++;
+                            else if ("Dời lịch".equals(item.statusText)) postponedTasks++;
+                            else if ("Chưa bắt đầu".equals(item.statusText)) skippedTasks++;
+                        }
+
+                        if (progressCompleted != null && totalTasks > 0) progressCompleted.setProgress((completedTasks * 100) / totalTasks);
+                        if (progressPostponed != null && totalTasks > 0) progressPostponed.setProgress((postponedTasks * 100) / totalTasks);
+                        if (progressSkipped != null && totalTasks > 0) progressSkipped.setProgress((skippedTasks * 100) / totalTasks);
+
+                        // Cập nhật task count
+                        if (progressTasksToday != null) progressTasksToday.setProgress(totalTasks > 0 ? (completedTasks * 100) / totalTasks : 0);
+                        if (tvTasksCount != null) tvTasksCount.setText(completedTasks + "/" + totalTasks + " tasks");
                     });
                 }
             } catch (Exception ignored) { }
         }).start();
+    }
+
+    // Phương thức tính streak: số ngày liên tiếp có ít nhất 1 task hoàn thành
+    private int calculateStreak(com.example.goalmanagement.data.AppDatabase db, java.text.SimpleDateFormat sdf) {
+        int streak = 0;
+        java.util.Calendar cal = java.util.Calendar.getInstance();
+        while (true) {
+            String dayKey = sdf.format(cal.getTime());
+            int completedCount = db.taskDao().countByDayAndStatus(dayKey, "completed");
+            if (completedCount > 0) {
+                streak++;
+                cal.add(java.util.Calendar.DATE, -1); // Ngày trước
+            } else {
+                break;
+            }
+        }
+        return streak;
+    }
+
+    @Override
+    public void onResume() {
+        super.onResume();
+        loadTaskData(); // Refresh data when returning to this tab
     }
 
     // --- PHẦN CLASS TodayTaskItem ĐÃ ĐƯỢC XÓA KHỎI ĐÂY ---

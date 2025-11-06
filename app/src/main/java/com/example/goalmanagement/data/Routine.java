@@ -1,6 +1,7 @@
 package com.example.goalmanagement.data;
 
 import androidx.room.Entity;
+import androidx.room.Ignore;
 import androidx.room.PrimaryKey;
 
 @Entity(tableName = "routine")
@@ -19,6 +20,10 @@ public class Routine {
     // Thời gian nghỉ giữa môn (phút)
     public int breakMinutes;
 
+    // Ngày học trong tuần (dạng CSV: "2,3,4,5,6" cho Thứ 2-Thứ 6)
+    public String studyDaysCsv;
+
+    @Ignore
     public Routine(int wakeMinutesOfDay,
                    int sleepMinutesOfDay,
                    int studyStartMinutesOfDay,
@@ -29,6 +34,21 @@ public class Routine {
         this.studyStartMinutesOfDay = studyStartMinutesOfDay;
         this.studyEndMinutesOfDay = studyEndMinutesOfDay;
         this.breakMinutes = breakMinutes;
+        this.studyDaysCsv = "2,3,4,5,6"; // Mặc định Thứ 2-Thứ 6
+    }
+
+    public Routine(int wakeMinutesOfDay,
+                   int sleepMinutesOfDay,
+                   int studyStartMinutesOfDay,
+                   int studyEndMinutesOfDay,
+                   int breakMinutes,
+                   String studyDaysCsv) {
+        this.wakeMinutesOfDay = wakeMinutesOfDay;
+        this.sleepMinutesOfDay = sleepMinutesOfDay;
+        this.studyStartMinutesOfDay = studyStartMinutesOfDay;
+        this.studyEndMinutesOfDay = studyEndMinutesOfDay;
+        this.breakMinutes = breakMinutes;
+        this.studyDaysCsv = studyDaysCsv;
     }
 }
 

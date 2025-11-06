@@ -6,22 +6,33 @@ import androidx.recyclerview.widget.RecyclerView;
 import android.os.Bundle;
 import android.widget.ImageView;
 import android.widget.TextView;
+import android.widget.Toast;
+
+import com.example.goalmanagement.data.AppDatabase;
+import com.example.goalmanagement.data.NotificationEntity;
+
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
+import java.util.Locale;
 import android.graphics.Color;
 
-public class NotificationActivity extends AppCompatActivity {
+public class NotificationActivity extends AppCompatActivity implements NotificationAdapter.OnItemClickListener {
 
     RecyclerView rvNotifications;
     NotificationAdapter adapter;
     List<Notification> notificationList;
     TextView btnMarkAllRead;
     ImageView btnBack;
+    private AppDatabase db;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_notification);
+
+        db = AppDatabase.getInstance(this);
 
         rvNotifications = findViewById(R.id.rv_notifications);
         btnMarkAllRead = findViewById(R.id.btn_mark_all_read);
@@ -30,42 +41,123 @@ public class NotificationActivity extends AppCompatActivity {
         // Nút quay lại
         btnBack.setOnClickListener(v -> finish());
 
-        // Tải dữ liệu mẫu
-        loadDummyData();
-
-        // Thiết lập Adapter
-        adapter = new NotificationAdapter(this, notificationList);
+        // Thiết lập RecyclerView
         rvNotifications.setLayoutManager(new LinearLayoutManager(this));
-        rvNotifications.setAdapter(adapter);
+
+        // Load dữ liệu từ database
+        loadNotifications();
 
         // Xử lý nút "Đánh dấu đã đọc"
         btnMarkAllRead.setOnClickListener(v -> {
-            adapter.markAllAsRead();
-            btnMarkAllRead.setTextColor(Color.GRAY); // Đổi màu nút sang xám
-            btnMarkAllRead.setEnabled(false); // Vô hiệu hóa nút
+            new Thread(() -> {
+                db.notificationDao().markAllAsRead();
+                runOnUiThread(() -> {
+                    Toast.makeText(this, "Đã đánh dấu tất cả là đã đọc", Toast.LENGTH_SHORT).show();
+                    btnMarkAllRead.setTextColor(Color.GRAY);
+                    btnMarkAllRead.setEnabled(false);
+                    loadNotifications(); // Reload để cập nhật UI
+                });
+            }).start();
         });
     }
 
-    // Tạo dữ liệu mẫu (Sau này sẽ lấy từ database)
-    private void loadDummyData() {
-        notificationList = new ArrayList<>();
-        notificationList.add(new Notification("Nhắc nhở học tập",
-                "Đã đến giờ học TOEIC Reading Practice (19:00)",
-                "5 phút trước",
-                "reminder",
-                false,
-                "Thứ 2 ngày 13/09/2025 • 11:50 AM"));
-        notificationList.add(new Notification("Báo cáo tuần",
-                "Tuần này bạn đã học 10.5 giờ, giảm 2 giờ so với tuần trước.",
-                "5 phút trước",
-                "report",
-                true,
-                "Chủ nhật ngày 12/09/2025 • 9:00 AM"));
-        notificationList.add(new Notification("Cảnh báo tiến độ",
-                "Bạn đã bỏ qua 2 task hôm nay. Điều này có thể ảnh hưởng đến mục tiêu.",
-                "5 phút trước",
-                "progress",
-                false,
-                "Thứ 2 ngày 13/09/2025 • 7:30 AM"));
+    private void loadNotifications() {
+        new Thread(() -> {
+            List<NotificationEntity> entities = db.notificationDao().getAll();
+            notificationList = new ArrayList<>();
+
+            SimpleDateFormat timeFormat = new SimpleDateFormat("HH:mm", Locale.getDefault());
+            SimpleDateFormat dateFormat = new SimpleDateFormat("dd/MM/yyyy", Locale.getDefault());
+
+            for (NotificationEntity entity : entities) {
+                String timeAgo = getTimeAgo(entity.timestamp);
+                String detailDateTime = getDetailDateTime(entity.timestamp);
+
+                String iconType = getIconTypeForNotification(entity.type);
+
+                Notification notification = new Notification(
+                    entity.title,
+                    entity.content,
+                    timeAgo,
+                    iconType,
+                    entity.isRead,
+                    detailDateTime
+                );
+                notificationList.add(notification);
+            }
+
+            runOnUiThread(() -> {
+                adapter = new NotificationAdapter(this, notificationList);
+                adapter.setOnItemClickListener(this);
+                rvNotifications.setAdapter(adapter);
+
+                // Cập nhật trạng thái nút "Đánh dấu tất cả đã đọc"
+                boolean hasUnread = notificationList.stream().anyMatch(n -> !n.isRead);
+                btnMarkAllRead.setEnabled(hasUnread);
+                btnMarkAllRead.setTextColor(hasUnread ? Color.BLACK : Color.GRAY);
+            });
+        }).start();
+    }
+
+    private String getIconTypeForNotification(String type) {
+        switch (type) {
+            case "reminder": return "bell";
+            case "warning": return "warning";
+            case "report": return "chart";
+            case "progress": return "progress";
+            default: return "bell";
+        }
+    }
+
+    private String getTimeAgo(long timestamp) {
+        long now = System.currentTimeMillis();
+        long diff = now - timestamp;
+
+        long seconds = diff / 1000;
+        long minutes = seconds / 60;
+        long hours = minutes / 60;
+        long days = hours / 24;
+
+        if (days > 0) {
+            return days + " ngày trước";
+        } else if (hours > 0) {
+            return hours + " giờ trước";
+        } else if (minutes > 0) {
+            return minutes + " phút trước";
+        } else {
+            return "Vừa xong";
+        }
+    }
+
+    private String getDetailDateTime(long timestamp) {
+        SimpleDateFormat dateFormat = new SimpleDateFormat("EEEE 'ngày' dd/MM/yyyy '•' HH:mm", new Locale("vi", "VN"));
+        return dateFormat.format(new Date(timestamp));
+    }
+
+    @Override
+    public void onItemClick(Notification notification) {
+        // Đánh dấu là đã đọc trong database
+        int index = notificationList.indexOf(notification);
+        if (index >= 0) {
+            new Thread(() -> {
+                // Tìm entity tương ứng trong database
+                List<NotificationEntity> entities = db.notificationDao().getAll();
+                if (index < entities.size()) {
+                    NotificationEntity entity = entities.get(index);
+                    db.notificationDao().markAsRead(entity.id);
+
+                    runOnUiThread(() -> {
+                        notification.isRead = true;
+                        adapter.notifyItemChanged(index);
+                        Toast.makeText(this, "Đã đánh dấu là đã đọc", Toast.LENGTH_SHORT).show();
+
+                        // Cập nhật trạng thái nút "Đánh dấu tất cả đã đọc"
+                        boolean hasUnread = notificationList.stream().anyMatch(n -> !n.isRead);
+                        btnMarkAllRead.setEnabled(hasUnread);
+                        btnMarkAllRead.setTextColor(hasUnread ? Color.BLACK : Color.GRAY);
+                    });
+                }
+            }).start();
+        }
     }
 }

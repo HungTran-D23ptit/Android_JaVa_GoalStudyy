@@ -1,5 +1,6 @@
 package com.example.goalmanagement;
 
+import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import android.content.SharedPreferences;
 import android.os.Bundle;
@@ -8,12 +9,14 @@ import android.widget.EditText;
 import android.widget.TextView;
 import android.content.Intent;
 import android.widget.Toast;
+import com.example.goalmanagement.data.AppDatabase;
+import com.example.goalmanagement.data.User;
 
 public class LoginActivity extends AppCompatActivity {
 
     Button btnLoginSubmit;
     TextView tvGoToRegister, tvForgotPassword;
-    EditText etLoginEmail, etLoginPassword; // Thêm các EditText
+    EditText etLoginEmail, etLoginPassword;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -44,46 +47,53 @@ public class LoginActivity extends AppCompatActivity {
             String email = etLoginEmail.getText().toString().trim();
             String password = etLoginPassword.getText().toString().trim();
 
-            // --- KIỂM TRA DỮ LIỆU ---
+            // Kiểm tra dữ liệu
             if (email.isEmpty()) {
                 Toast.makeText(this, "Vui lòng nhập email", Toast.LENGTH_SHORT).show();
-                return; // Dừng lại
+                return;
             }
-            // TODO: (Sau này) Kiểm tra email, password với Firebase/Database
-            // ...
-
-            // --- SỬA LOGIC LẤY TÊN NGƯỜI DÙNG TẠI ĐÂY ---
-            String userName;
-            if (email.contains("@")) {
-                // Tách email thành 2 phần tại dấu @ và lấy phần đầu tiên
-                userName = email.split("@")[0];
-            } else {
-                // Nếu người dùng nhập tên không có @, tạm dùng chính tên đó
-                userName = email;
+            if (password.isEmpty()) {
+                Toast.makeText(this, "Vui lòng nhập mật khẩu", Toast.LENGTH_SHORT).show();
+                return;
             }
-            // Dòng "String name = "Hoahoang";" đã bị xóa
-            // --- KẾT THÚC SỬA ---
 
-            // --- GIẢ SỬ ĐĂNG NHẬP THÀNH CÔNG ---
-            Toast.makeText(this, "Đăng nhập thành công!", Toast.LENGTH_SHORT).show();
-
-            // 1. Lưu trạng thái (dùng tên và email THẬT)
-            saveLoginState(true, userName, email);
-
-            // 2. Đóng màn hình Login
-            finish();
+            // Đăng nhập đơn giản (mô phỏng)
+            loginSimple(email, password);
         });
+    }
+
+    private void loginSimple(String email, String password) {
+        new Thread(() -> {
+            AppDatabase db = AppDatabase.getInstance(getApplicationContext());
+            User user = db.userDao().getByEmail(email);
+            runOnUiThread(() -> {
+                if (user != null && user.password.equals(password)) {
+                    // Đăng nhập thành công
+                    String displayName = user.name;
+
+                    // Lưu trạng thái đăng nhập
+                    saveLoginState(true, displayName, email);
+
+                    Toast.makeText(this, "Đăng nhập thành công!", Toast.LENGTH_SHORT).show();
+
+                    // Đóng màn hình Login
+                    finish();
+                } else {
+                    // Đăng nhập thất bại
+                    Toast.makeText(this, "Email hoặc mật khẩu không đúng", Toast.LENGTH_SHORT).show();
+                }
+            });
+        }).start();
     }
 
     /**
      * Hàm tiện ích để lưu trạng thái đăng nhập
-     * Nó sẽ lưu vào file "UserPrefs"
      */
     private void saveLoginState(boolean isLoggedIn, String name, String email) {
         SharedPreferences.Editor editor = getSharedPreferences(ProfileActivity.PREFS_NAME, MODE_PRIVATE).edit();
         editor.putBoolean(ProfileActivity.IS_LOGGED_IN_KEY, isLoggedIn);
-        editor.putString(ProfileActivity.USER_NAME_KEY, name); // Lưu tên THẬT
-        editor.putString(ProfileActivity.USER_EMAIL_KEY, email); // Lưu email THẬT
-        editor.apply(); // Dùng apply() là đủ ở đây
+        editor.putString(ProfileActivity.USER_NAME_KEY, name);
+        editor.putString(ProfileActivity.USER_EMAIL_KEY, email);
+        editor.apply();
     }
 }

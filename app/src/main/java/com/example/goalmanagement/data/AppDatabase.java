@@ -8,19 +8,23 @@ import androidx.room.RoomDatabase;
 
 @Database(
         entities = {
+                User.class,
                 Goal.class,
                 Task.class,
-                Routine.class
+                Routine.class,
+                NotificationEntity.class
         },
-        version = 1,
+        version = 4,
         exportSchema = false
 )
 public abstract class AppDatabase extends RoomDatabase {
     private static volatile AppDatabase INSTANCE;
 
+    public abstract UserDao userDao();
     public abstract GoalDao goalDao();
     public abstract TaskDao taskDao();
     public abstract RoutineDao routineDao();
+    public abstract NotificationDao notificationDao();
 
     public static AppDatabase getInstance(Context context) {
         if (INSTANCE == null) {

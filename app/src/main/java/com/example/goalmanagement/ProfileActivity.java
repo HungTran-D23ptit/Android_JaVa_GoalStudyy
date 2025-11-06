@@ -13,14 +13,16 @@ import android.widget.Toast;
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
-// import androidx.core.content.ContextCompat; // Không cần
 import com.google.android.material.bottomnavigation.BottomNavigationView;
 import com.google.android.material.navigation.NavigationBarView;
+import com.example.goalmanagement.data.AppDatabase;
+import com.example.goalmanagement.data.User;
 
 public class ProfileActivity extends AppCompatActivity {
 
     BottomNavigationView bottomNav;
-    TextView btnPersonalInfo, btnShareApp, btnThemeColor, btnActivitySchedule, btnSettings, btnAuthAction;
+    View btnPersonalInfo, btnShareApp, btnThemeColor, btnActivitySchedule, btnSettings;
+    TextView btnAuthAction;
     ImageView btnBack, ivProfileAvatar;
     TextView tvProfileName, tvProfileEmail;
 
@@ -42,11 +44,11 @@ public class ProfileActivity extends AppCompatActivity {
         btnThemeColor = findViewById(R.id.btn_theme_color);
         btnActivitySchedule = findViewById(R.id.btn_activity_schedule);
         btnSettings = findViewById(R.id.btn_settings);
-        btnBack = findViewById(R.id.btn_profile_back);
-        btnAuthAction = findViewById(R.id.btn_auth_action);
-        tvProfileName = findViewById(R.id.tv_profile_name);
-        tvProfileEmail = findViewById(R.id.tv_profile_email);
-        ivProfileAvatar = findViewById(R.id.iv_profile_avatar);
+        btnBack = findViewById(R.id.backButton);
+        btnAuthAction = findViewById(R.id.logoutButton);
+        tvProfileName = findViewById(R.id.userName);
+        tvProfileEmail = findViewById(R.id.userEmail);
+        ivProfileAvatar = findViewById(R.id.userIcon);
 
         // Xử lý click
         btnBack.setOnClickListener(v -> finish());
@@ -82,16 +84,33 @@ public class ProfileActivity extends AppCompatActivity {
         SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
         boolean isLoggedIn = prefs.getBoolean(IS_LOGGED_IN_KEY, false);
         if (isLoggedIn) {
-            String name = prefs.getString(USER_NAME_KEY, "Người dùng");
-            String email = prefs.getString(USER_EMAIL_KEY, "email@example.com");
-            tvProfileName.setText(name);
-            tvProfileEmail.setText(email);
-            tvProfileName.setVisibility(View.VISIBLE);
-            tvProfileEmail.setVisibility(View.VISIBLE);
-            ivProfileAvatar.setImageResource(R.drawable.ic_profile);
-            btnAuthAction.setText("Đăng xuất");
-            btnAuthAction.setCompoundDrawablesWithIntrinsicBounds(0, 0, R.drawable.ic_logout, 0);
-            btnAuthAction.setOnClickListener(v -> { showLogoutDialog(); });
+            String email = prefs.getString(USER_EMAIL_KEY, "");
+            if (!email.isEmpty()) {
+                new Thread(() -> {
+                    AppDatabase db = AppDatabase.getInstance(getApplicationContext());
+                    User user = db.userDao().getByEmail(email);
+                    runOnUiThread(() -> {
+                        if (user != null) {
+                            tvProfileName.setText(user.name);
+                            tvProfileEmail.setText(user.email);
+                            tvProfileName.setVisibility(View.VISIBLE);
+                            tvProfileEmail.setVisibility(View.VISIBLE);
+                            ivProfileAvatar.setImageResource(R.drawable.ic_profile);
+                            btnAuthAction.setText("Đăng xuất");
+                            btnAuthAction.setCompoundDrawablesWithIntrinsicBounds(0, 0, R.drawable.ic_logout, 0);
+                            btnAuthAction.setOnClickListener(v -> { showLogoutDialog(); });
+                        } else {
+                            // User not found in DB, logout
+                            saveLoginState(false);
+                            checkLoginState();
+                        }
+                    });
+                }).start();
+            } else {
+                // No email, logout
+                saveLoginState(false);
+                checkLoginState();
+            }
         } else {
             tvProfileName.setText("Khách");
             tvProfileEmail.setVisibility(View.GONE);

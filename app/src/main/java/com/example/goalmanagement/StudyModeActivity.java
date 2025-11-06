@@ -193,6 +193,10 @@ public class StudyModeActivity extends AppCompatActivity {
             new Thread(() -> {
                 com.example.goalmanagement.data.AppDatabase db = com.example.goalmanagement.data.AppDatabase.getInstance(getApplicationContext());
                 db.taskDao().updateStatus(taskId, "completed");
+
+                // Tạo notification báo cáo tiến độ
+                MissedTaskChecker checker = new MissedTaskChecker(getApplicationContext());
+                checker.generateWeeklyProgressReport();
             }).start();
         }
         Toast.makeText(this, "Đã hoàn thành!", Toast.LENGTH_SHORT).show();

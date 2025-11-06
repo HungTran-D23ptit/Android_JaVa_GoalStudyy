@@ -1,11 +1,9 @@
 package com.example.goalmanagement;
 
 import androidx.appcompat.app.AppCompatActivity;
-import androidx.cardview.widget.CardView;
 import android.app.DatePickerDialog;
 import android.app.TimePickerDialog;
 import android.os.Bundle;
-import android.view.View;
 import android.widget.Button;
 import android.widget.DatePicker;
 import android.widget.EditText;
@@ -18,11 +16,8 @@ import com.example.goalmanagement.scheduler.ScheduleGenerator;
 import java.util.Calendar;
 
 public class CreateGoalActivity extends AppCompatActivity {
-    EditText etCurrentScore, etTargetScore, etGoalTime, etHoursPerDay;
+    EditText etCurrentScore, etTargetScore, etGoalTime, etHoursPerDay, etGoalType, etSubjects;
     Button btnCreateGoalFinal;
-    CardView cardGoalTypeToeic, cardGoalTypeIelts, cardGoalTypeReading, cardGoalTypeExercise;
-    private CardView selectedGoalTypeCard = null;
-    private String selectedGoalType = "";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -32,18 +27,23 @@ public class CreateGoalActivity extends AppCompatActivity {
         etTargetScore = findViewById(R.id.et_target_score);
         etGoalTime = findViewById(R.id.et_goal_time);
         etHoursPerDay = findViewById(R.id.et_hours_per_day);
+        etGoalType = findViewById(R.id.et_goal_type);
+        etSubjects = findViewById(R.id.et_subjects);
         btnCreateGoalFinal = findViewById(R.id.btn_create_goal_final);
-        cardGoalTypeToeic = findViewById(R.id.card_goal_type_toeic);
-        cardGoalTypeIelts = findViewById(R.id.card_goal_type_ielts);
-        cardGoalTypeReading = findViewById(R.id.card_goal_type_reading);
-        cardGoalTypeExercise = findViewById(R.id.card_goal_type_exercise);
         etGoalTime.setOnClickListener(v -> showDatePickerDialog(etGoalTime));
         etHoursPerDay.setOnClickListener(v -> showTimePickerDialog(etHoursPerDay));
-        setupGoalTypeCards();
 
         btnCreateGoalFinal.setOnClickListener(v -> {
-            if (selectedGoalTypeCard == null) {
-                Toast.makeText(this, "Vui lòng chọn loại mục tiêu", Toast.LENGTH_SHORT).show();
+            String goalType = etGoalType.getText().toString().trim();
+            if (goalType.isEmpty()) {
+                Toast.makeText(this, "Vui lòng nhập loại mục tiêu", Toast.LENGTH_SHORT).show();
+                etGoalType.requestFocus();
+                return;
+            }
+            String subjects = etSubjects.getText().toString().trim();
+            if (subjects.isEmpty()) {
+                Toast.makeText(this, "Vui lòng nhập các môn học (cách nhau bằng dấu phẩy)", Toast.LENGTH_SHORT).show();
+                etSubjects.requestFocus();
                 return;
             }
             String goalTime = etGoalTime.getText().toString().trim();
@@ -108,22 +108,17 @@ public class CreateGoalActivity extends AppCompatActivity {
                     return;
                 }
 
-                String subjectsCsv;
-                if ("Toeic".equalsIgnoreCase(selectedGoalType)) subjectsCsv = "Listening,Reading,Vocabulary,Grammar";
-                else if ("Ielts".equalsIgnoreCase(selectedGoalType)) subjectsCsv = "Listening,Reading,Writing,Speaking";
-                else if ("Đọc sách".equalsIgnoreCase(selectedGoalType)) subjectsCsv = "Reading";
-                else if ("Tập thể dục".equalsIgnoreCase(selectedGoalType)) subjectsCsv = "Exercise";
-                else subjectsCsv = selectedGoalType;
+                String subjectsCsv = subjects.replace(" ", "").replace("，", ",");
 
                 new Thread(() -> {
                     try {
                         AppDatabase db = AppDatabase.getInstance(getApplicationContext());
-                        Goal goal = new Goal(selectedGoalType + (targetScore.isEmpty() ? "" : " " + targetScore), deadlineMillis, minutesPerDay, subjectsCsv, 0, System.currentTimeMillis());
+                        Goal goal = new Goal(goalType + (targetScore.isEmpty() ? "" : " " + targetScore), deadlineMillis, minutesPerDay, subjectsCsv, 0, System.currentTimeMillis());
                         long goalId = db.goalDao().insert(goal);
                         goal.id = goalId;
                         Routine routine = db.routineDao().getSingle();
                         if (routine == null) {
-                            routine = new Routine(420, 1380, 1140, 1350, 10);
+                            routine = new Routine(420, 1380, 1140, 1350, 10, "2,3,4,5,6");
                             db.routineDao().insert(routine);
                         }
                         ScheduleGenerator.generateAndSave(getApplicationContext(), goal, routine);
@@ -162,29 +157,5 @@ public class CreateGoalActivity extends AppCompatActivity {
         timePickerDialog.show();
     }
 
-    private void setupGoalTypeCards() {
-        View.OnClickListener cardClickListener = v -> {
-            if (selectedGoalTypeCard != null) resetCardBackground(selectedGoalTypeCard);
-            selectedGoalTypeCard = (CardView) v;
-            highlightCardBackground(selectedGoalTypeCard);
-            int id = v.getId();
-            if (id == R.id.card_goal_type_toeic) selectedGoalType = "Toeic";
-            else if (id == R.id.card_goal_type_ielts) selectedGoalType = "Ielts";
-            else if (id == R.id.card_goal_type_reading) selectedGoalType = "Đọc sách";
-            else if (id == R.id.card_goal_type_exercise) selectedGoalType = "Tập thể dục";
-        };
-        cardGoalTypeToeic.setOnClickListener(cardClickListener);
-        cardGoalTypeIelts.setOnClickListener(cardClickListener);
-        cardGoalTypeReading.setOnClickListener(cardClickListener);
-        cardGoalTypeExercise.setOnClickListener(cardClickListener);
-    }
 
-    private void resetCardBackground(CardView cardView) {
-        cardView.setCardBackgroundColor(getResources().getColor(android.R.color.white));
-    }
-
-    private void highlightCardBackground(CardView cardView) {
-        int highlightColor = getResources().getColor(R.color.colorCardCreateGoal);
-        cardView.setCardBackgroundColor(highlightColor);
-    }
 }

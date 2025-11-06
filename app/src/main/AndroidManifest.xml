@@ -27,6 +27,7 @@
         <activity android:name=".CreateGoalActivity" android:exported="false" />
         <activity android:name=".CreateTaskActivity" android:exported="false" />
         <activity android:name=".ScheduleActivity" android:exported="false" />
+        <activity android:name=".RoutineSetupActivity" android:exported="false" />
         <activity android:name=".ProgressActivity" android:exported="false" />
         <activity android:name=".StudyModeActivity" android:exported="false" />
         <activity android:name=".NotificationActivity" android:exported="false" />
